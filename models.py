@@ -19,7 +19,8 @@ def weights_init_normal(m):
 class UNetDown(nn.Module):
     def __init__(self, in_size, out_size, ksize=4, stride=2, normalize=True, dropout=0.0):
         super(UNetDown, self).__init__()
-        layers = [nn.Conv1d(in_size, out_size, kernel_size=ksize, stride=stride, bias=False, padding_mode='replicate')]
+        layers = [nn.Conv1d(in_size, out_size, kernel_size=ksize,
+                            stride=stride, bias=False, padding_mode='replicate')]
         if normalize:
             layers.append(nn.InstanceNorm1d(out_size))
         layers.append(nn.LeakyReLU(0.2))
@@ -35,7 +36,8 @@ class UNetUp(nn.Module):
     def __init__(self, in_size, out_size, ksize=4, stride=2, output_padding=0, dropout=0.0):
         super(UNetUp, self).__init__()
         layers = [
-            nn.ConvTranspose1d(in_size, out_size, kernel_size=ksize, stride=stride, output_padding=output_padding, bias=False),
+            nn.ConvTranspose1d(in_size, out_size, kernel_size=ksize,
+                               stride=stride, output_padding=output_padding, bias=False),
             nn.InstanceNorm1d(out_size),
             nn.ReLU(inplace=True),
         ]
@@ -67,7 +69,8 @@ class GeneratorUNet(nn.Module):
         self.final = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.ConstantPad1d((1, 1), 0),
-            nn.Conv1d(256, out_channels, 4, padding=2, padding_mode='replicate'),
+            nn.Conv1d(256, out_channels, 4, padding=2,
+                      padding_mode='replicate'),
             nn.Tanh(),
         )
 
@@ -95,7 +98,8 @@ class Discriminator(nn.Module):
 
         def discriminator_block(in_filters, out_filters, ksize=6, stride=3, normalization=True):
             """Returns downsampling layers of each discriminator block"""
-            layers = [nn.Conv1d(in_filters, out_filters, ksize, stride=stride, padding_mode='replicate')]
+            layers = [nn.Conv1d(in_filters, out_filters, ksize,
+                                stride=stride, padding_mode='replicate')]
             if normalization:
                 layers.append(nn.InstanceNorm1d(out_filters))
             layers.append(nn.LeakyReLU(0.2, inplace=True))
@@ -113,8 +117,8 @@ class Discriminator(nn.Module):
         signal_input = torch.cat((signal_A, signal_B), 1)
         return self.model(signal_input)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #generator = GeneratorUNet().to(device)
 #summary(generator, input_size=(1, 375))
-discriminator = Discriminator().to(device)
-summary(discriminator, input_size=[(1, 375), (1, 375)])
+# discriminator = Discriminator().to(device)
+# summary(discriminator, input_size=[(1, 375), (1, 375)])
