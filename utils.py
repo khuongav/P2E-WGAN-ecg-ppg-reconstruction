@@ -1,24 +1,58 @@
 from joblib import Parallel, delayed
-from pylab import rcParams
 import torch
+import torch.autograd as autograd
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 import matplotlib
 matplotlib.use('Agg')
-# import imageio
-rcParams['figure.figsize'] = 17, 15
+plt.rcParams['figure.figsize'] = 17, 15
 
 # import similaritymeasures
 
 
-def sample_images(dataset_name, val_dataloader, generator, images, writer, steps, device):
+def compute_gradient_penalty(D, real_samples, fake_samples, real_A, patch, device):
+    """Calculates the gradient penalty loss for WGAN GP"""
+    alpha = torch.rand((real_samples.size(0), 1, 1)).to(device)
+    interpolates = (alpha * real_samples + ((1 - alpha)
+                                            * fake_samples)).requires_grad_(True)
+    d_interpolates = D(interpolates, real_A)
+    fake = torch.full(
+        (real_samples.shape[0], *patch), 1, dtype=torch.float, device=device)
+
+    # Get gradient w.r.t. interpolates
+    gradients = autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=fake,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True,
+    )[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
+
+
+mean_conv = torch.nn.Conv1d(in_channels=1, out_channels=1, kernel_size=4,
+                            bias=False, padding_mode='replicate', padding=1)
+mean_conv.weight.data = torch.full_like(
+    mean_conv.weight.data, 0.25)
+pad = torch.nn.ReplicationPad1d((0, 1))
+
+
+def smoother(fake, device):
+    fake = mean_conv.to(device)(fake)
+    fake = pad.to(device)(fake)
+    return fake
+
+
+def sample_images(dataset_name, val_dataloader, generator, steps, device):
     """Saves a generated sample from the validation set"""
 
     generator.eval()
 
     current_img_dir = "sample_signals/%s/%s.png" % (dataset_name, steps)
-    # gif_img_dir = "sample_signals/%s/progress.gif" % (dataset_name)
 
     signals = next(iter(val_dataloader))
     real_A = signals[0].to(device)
@@ -42,12 +76,7 @@ def sample_images(dataset_name, val_dataloader, generator, images, writer, steps
         axes[idx][2].plot(fake_B[idx], color='y')
 
     fig.canvas.draw()
-    # ncols, nrows = fig.canvas.get_width_height()
-    # image_from_plot = np.fromstring(fig.canvas.tostring_rgb(), dtype='uint8').reshape(nrows, ncols, 3)[:, :, 2:3]
     fig.savefig(current_img_dir)
-    # writer.add_image('images', image_from_plot, steps, dataformats='HWC')
-    # images.append(image_from_plot)
-    # imageio.mimsave(gif_img_dir, images)
     plt.close(fig)
 
 
@@ -102,16 +131,3 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
     if writer:
         writer.add_scalars('losses4', {'rms_error': rmse_mean}, steps)
         writer.add_scalars('losses4', {'p_mean': p_mean}, steps)
-
-
-mean_conv = torch.nn.Conv1d(in_channels=1, out_channels=1, kernel_size=4,
-                            bias=False, padding_mode='replicate', padding=1)
-mean_conv.weight.data = torch.full_like(
-    mean_conv.weight.data, 0.25)
-pad = torch.nn.ReplicationPad1d((0, 1))
-
-
-def smoother(fake, device):
-    fake = mean_conv.to(device)(fake)
-    fake = pad.to(device)(fake)
-    return fake
