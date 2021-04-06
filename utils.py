@@ -48,7 +48,7 @@ def smoother(fake, device):
 
 
 def sample_images(dataset_name, val_dataloader, generator, steps, device):
-    """Saves a generated sample from the validation set"""
+    """Saves generated signals from the validation set"""
 
     generator.eval()
 
@@ -90,8 +90,6 @@ def eval_rmse_p(signal_a, signal_b):
 def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, device):
     generator.eval()
 
-    all_signal = []
-    all_generated_signal = []
     all_signal_ = []
     all_generated_signal_ = []
 
@@ -104,9 +102,6 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
         fake_B = generator(real_A)
         fake_B = smoother(fake_B, device)
         fake_B = torch.squeeze(fake_B).cpu().detach().numpy()
-
-        all_signal.append(real_B.flatten())
-        all_generated_signal.append(fake_B.flatten())
 
         all_signal_.append(real_B)
         all_generated_signal_.append(fake_B)
