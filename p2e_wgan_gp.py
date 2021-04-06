@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 from models import weights_init_normal, GeneratorUNet, Discriminator
 from data import get_data_loader
-from utils import sample_images, evaluate_generated_signal_quality
+from utils import sample_images, evaluate_generated_signal_quality, smoother
 
 torch.backends.cudnn.benchmark = True
 
@@ -23,8 +23,10 @@ parser.add_argument("--is_eval", type=bool,
                     default=False, help="evaluation mode")
 parser.add_argument("--from_ppg", type=bool, default=True,
                     help="reconstruct from ppg")
+parser.add_argument("--peaks_only", type=bool, default=True,
+                    help="L2 loss on peaks only")
 parser.add_argument("--dataset_name", type=str,
-                    default="mimic_mse_peaks_only_cleaned_wgan_gp", help="name of the dataset")
+                    default="mimic_wgan_gp", help="name of the dataset")
 parser.add_argument("--n_epochs", type=int, default=10000,
                     help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=192,
@@ -72,9 +74,9 @@ if cuda:
     if torch.cuda.device_count() > 1:
         # if False:
         generator = torch.nn.DataParallel(
-            generator, device_ids=[1, 2, 3]).to(device)
+            generator, device_ids=[0, 1, 2]).to(device)
         discriminator = torch.nn.DataParallel(
-            discriminator, device_ids=[1, 2, 3]).to(device)
+            discriminator, device_ids=[0, 1, 2]).to(device)
     else:
         generator = generator.to(device)
         discriminator = discriminator.to(device)
@@ -177,17 +179,16 @@ for epoch in range(args.epoch+1, args.n_epochs):
                     fake_B_masked_rpeaks, rpeaks)
                 loss_pixel = loss_pixel_opeaks / opeak_count + \
                     rpeak_weight * loss_pixel_rpeaks / rpeak_count
-                #loss_pixel = loss_pixel + criterion_pixelwise(fake_B, real_B)
+
+                if not args.peaks_only:
+                    loss_pixel = loss_pixel + \
+                        criterion_pixelwise(fake_B, real_B)
             else:
                 loss_pixel = criterion_pixelwise(fake_B, real_B)
 
-            mean_conv = torch.nn.Conv1d(in_channels=1, out_channels=1, kernel_size=4,
-                                        bias=False, padding_mode='replicate', padding=1).to(device)
-            mean_conv.weight.data = torch.full_like(
-                mean_conv.weight.data, 0.25).to(device)
-            fake_B = mean_conv(fake_B)
-            pad = torch.nn.ReplicationPad1d((0, 1))
-            fake_B = pad(fake_B)
+            # Smooth the output with moving averages
+            if args.from_ppg:
+                fake_B = smoother(fake_B, device)
 
             pred_fake = discriminator(fake_B, real_A)
             loss_GAN = -torch.mean(pred_fake)
@@ -196,7 +197,6 @@ for epoch in range(args.epoch+1, args.n_epochs):
             loss_G = gen_weight * loss_GAN + lambda_pixel * loss_pixel
 
             loss_G.backward()
-
             optimizer_G.step()
 
         else:
