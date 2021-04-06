@@ -62,30 +62,30 @@ def get_bio_data(from_data_path, to_data_path, ecg_peaks_data_path=None):
 
 def get_data_loader(batch_size, from_ppg, shuffle_training=True):
     train_ppg_data_path = 'data/mimic/ppg_train.npy'
-    test_ppg_data_path = 'data/mimic/ppg_test.npy'
+    eval_ppg_data_path = 'data/mimic/ppg_eval.npy'
 
     train_ecg_data_path = 'data/mimic/ecg_train.npy'
-    test_ecg_data_path = 'data/mimic/ecg_test.npy'
+    eval_ecg_data_path = 'data/mimic/ecg_eval.npy'
 
     train_ecg_peaks_data_path = {'opeaks': 'data/mimic/ecg_opeaks_train.npy',
                                  'rpeaks': 'data/mimic/ecg_rpeaks_train.npy'}
 
-    test_ecg_peaks_data_path = {'opeaks': 'data/mimic/ecg_opeaks_test.npy',
-                                'rpeaks': 'data/mimic/ecg_rpeaks_test.npy'}
+    eval_ecg_peaks_data_path = {'opeaks': 'data/mimic/ecg_opeaks_eval.npy',
+                                'rpeaks': 'data/mimic/ecg_rpeaks_eval.npy'}
 
     if from_ppg:
         train_data = get_bio_data(
             train_ppg_data_path, train_ecg_data_path, train_ecg_peaks_data_path)
-        test_data = get_bio_data(
-            test_ppg_data_path, test_ecg_data_path, test_ecg_peaks_data_path)
+        eval_data = get_bio_data(
+            eval_ppg_data_path, eval_ecg_data_path, eval_ecg_peaks_data_path)
     else:
         train_data = get_bio_data(train_ecg_data_path, train_ppg_data_path)
-        test_data = get_bio_data(test_ecg_data_path, test_ppg_data_path)
+        eval_data = get_bio_data(eval_ecg_data_path, eval_ppg_data_path)
 
     train_data_loader = DataLoader(
         train_data, batch_size=batch_size, shuffle=shuffle_training, num_workers=4, pin_memory=True)
 
-    test_data_loader = DataLoader(
-        test_data, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+    eval_data_loader = DataLoader(
+        eval_data, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
-    return train_data_loader, test_data_loader
+    return train_data_loader, eval_data_loader
