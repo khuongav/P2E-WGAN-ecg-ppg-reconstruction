@@ -1,15 +1,14 @@
+from joblib import Parallel, delayed
+from pylab import rcParams
+import torch
+import matplotlib.pyplot as plt
 import numpy as np
-import scipy
+from scipy import stats
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import torch
 # import imageio
-from pylab import rcParams
 rcParams['figure.figsize'] = 17, 15
 
-from biosppy.signals.tools import rms_error, pearson_correlation
-from joblib import Parallel, delayed
 # import similaritymeasures
 
 
@@ -25,6 +24,7 @@ def sample_images(dataset_name, val_dataloader, generator, images, writer, steps
     real_A = signals[0].to(device)
     real_B = signals[1].to(device)
     fake_B = generator(real_A)
+    fake_B = smoother(fake_B, device)
 
     real_A = torch.squeeze(real_A).cpu().detach().numpy()
     real_B = torch.squeeze(real_B).cpu().detach().numpy()
@@ -52,8 +52,8 @@ def sample_images(dataset_name, val_dataloader, generator, images, writer, steps
 
 
 def eval_rmse_p(signal_a, signal_b):
-    rmse = rms_error(signal_a, signal_b)['rmse']
-    p = scipy.stats.pearsonr(signal_a, signal_b)[0]
+    rmse = np.sqrt(((signal_a - signal_b) ** 2).mean())
+    p = stats.pearsonr(signal_a, signal_b)[0]
 
     return rmse, p
 
@@ -71,8 +71,9 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
 
         real_B = batch[1].to(device)
         real_B = torch.squeeze(real_B).cpu().detach().numpy()
-        # print(real_A.shape)
+
         fake_B = generator(real_A)
+        fake_B = smoother(fake_B, device)
         fake_B = torch.squeeze(fake_B).cpu().detach().numpy()
 
         all_signal.append(real_B.flatten())
@@ -80,13 +81,6 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
 
         all_signal_.append(real_B)
         all_generated_signal_.append(fake_B)
-
-    whole_signal = np.concatenate(all_signal)
-    whole_generated_signal = np.concatenate(all_generated_signal)
-
-    rmse = rms_error(whole_signal, whole_generated_signal)
-    p1 = pearson_correlation(whole_signal, whole_generated_signal)['rxy']
-    #p2 = scipy.stats.pearsonr(whole_signal, whole_generated_signal)
 
     all_signal = np.vstack(all_signal_)
     all_generated_signal = np.vstack(all_generated_signal_)
@@ -99,17 +93,25 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
     p_mean, p_std = np.mean(res[1]), np.std(res[1])
 
     print('\nepoch: ', steps)
-    print('rms_error: ', rmse)
-    print('pearson_correlation_biosppy: ', p1)
-    #print('pearson_correlation_scipy: ', p2[0], p2[1])
-    print(rmse_mean, rmse_std)
-    print(p_mean, p_std)
-
+    print('rmse_mean:', rmse_mean, ', rmse_std:', rmse_std)
+    print('p_mean:', p_mean, ', p_std:', p_std)
     # fdists = []
     # fdists = Parallel(n_jobs=32)(delayed(similaritymeasures.frechet_dist)(sig, all_signal[i]) for i, sig in enumerate(all_generated_signal))
     # print('frechet distance: ', np.mean(fdists), np.std(fdists))
 
     if writer:
-        writer.add_scalars('losses4', {'rms_error': rmse['rmse']}, steps)
-        writer.add_scalars('losses4', {'pearson_correlation': p1}, steps)
+        writer.add_scalars('losses4', {'rms_error': rmse_mean}, steps)
         writer.add_scalars('losses4', {'p_mean': p_mean}, steps)
+
+
+mean_conv = torch.nn.Conv1d(in_channels=1, out_channels=1, kernel_size=4,
+                            bias=False, padding_mode='replicate', padding=1)
+mean_conv.weight.data = torch.full_like(
+    mean_conv.weight.data, 0.25)
+pad = torch.nn.ReplicationPad1d((0, 1))
+
+
+def smoother(fake, device):
+    fake = mean_conv.to(device)(fake)
+    fake = pad.to(device)(fake)
+    return fake
