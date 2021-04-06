@@ -86,6 +86,6 @@ def get_data_loader(batch_size, from_ppg, shuffle_training=True):
         train_data, batch_size=batch_size, shuffle=shuffle_training, num_workers=4, pin_memory=True)
 
     eval_data_loader = DataLoader(
-        eval_data, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
+        eval_data, batch_size=15, shuffle=True, num_workers=4, pin_memory=True)
 
     return train_data_loader, eval_data_loader
