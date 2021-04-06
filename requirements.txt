@@ -1,0 +1,9 @@
+argparse
+joblib
+matplotlib
+numpy
+scipy
+tensorboardX
+torch-summary
+torch>=1.6.0
+torchvision>=0.7.0
