@@ -56,18 +56,18 @@ cuda = True if torch.cuda.is_available() else False
 
 # Weighting for L2 loss
 if args.peaks_only:
-    lambda_pixel = 20
+    lambda_sample = 20
     rpeak_weight = 4
 else:
-    lambda_pixel = 50
+    lambda_sample = 50
 
 # Loss functions
 if args.peaks_only:
-    criterion_pixelwise = torch.nn.MSELoss(reduction='sum')
+    criterion_samplewise = torch.nn.MSELoss(reduction='sum')
 else:
-    criterion_pixelwise = torch.nn.MSELoss()
+    criterion_samplewise = torch.nn.MSELoss()
 
-# Calculate output of signal discriminator (PatchGAN)
+# Output size of the discriminator (PatchGAN)
 patch = (1, 9)
 
 # Load data
@@ -89,7 +89,7 @@ if cuda:
         generator = generator.to(device)
         discriminator = discriminator.to(device)
 
-    criterion_pixelwise.to(device)
+    criterion_samplewise.to(device)
 
 # Optimizers
 optimizer_G = torch.optim.Adam(
@@ -149,7 +149,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
             # GAN loss
             fake_B = generator(real_A)
 
-            # Pixel-wise loss
+            # Sample-wise loss
             if args.from_ppg and args.peaks_only:
                 opeaks = batch[2].to(device)
                 rpeaks = batch[3].to(device)
@@ -158,14 +158,14 @@ for epoch in range(args.epoch+1, args.n_epochs):
                 opeak_count = torch.sum(opeaks != 0)
                 rpeak_count = torch.sum(rpeaks != 0)
 
-                loss_pixel_opeaks = criterion_pixelwise(
+                loss_sample_opeaks = criterion_samplewise(
                     fake_B_masked_opeaks, opeaks)
-                loss_pixel_rpeaks = criterion_pixelwise(
+                loss_sample_rpeaks = criterion_samplewise(
                     fake_B_masked_rpeaks, rpeaks)
-                loss_pixel = loss_pixel_opeaks / opeak_count + \
-                    rpeak_weight * loss_pixel_rpeaks / rpeak_count
+                loss_sample = loss_sample_opeaks / opeak_count + \
+                    rpeak_weight * loss_sample_rpeaks / rpeak_count
             else:
-                loss_pixel = criterion_pixelwise(fake_B, real_B)
+                loss_sample = criterion_samplewise(fake_B, real_B)
 
             # Smooth the output with moving averages
             if args.from_ppg:
@@ -175,7 +175,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
             loss_GAN = -torch.mean(pred_fake)
 
             # Total loss
-            loss_G = loss_GAN + lambda_pixel * loss_pixel
+            loss_G = loss_GAN + lambda_sample * loss_sample
 
             loss_G.backward()
             optimizer_G.step()
@@ -218,9 +218,9 @@ for epoch in range(args.epoch+1, args.n_epochs):
 
         # Print log
         sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [D0 loss: %f] [D loss: %f] [G loss: %f, pixel: %f, adv: %f] ETA: %s"
+            "\r[Epoch %d/%d] [Batch %d/%d] [D0 loss: %f] [D loss: %f] [G loss: %f, sample: %f, adv: %f] ETA: %s"
             % (epoch, args.n_epochs, i, len(dataloader),
-               loss_D0.item(), loss_D.item(), loss_G.item(), loss_pixel.item(), loss_GAN.item(),
+               loss_D0.item(), loss_D.item(), loss_G.item(), loss_sample.item(), loss_GAN.item(),
                time_left)
         )
 
@@ -231,7 +231,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
         writer.add_scalars(
             'losses2', {'gan_loss': loss_GAN.item()}, batches_done)
         writer.add_scalars(
-            'losses3', {'pixel_loss': loss_pixel.item()}, batches_done)
+            'losses3', {'sample_loss': loss_sample.item()}, batches_done)
 
     if args.checkpoint_interval != -1 and epoch % args.checkpoint_interval == 0:
         # Save model checkpoints
