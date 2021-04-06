@@ -84,11 +84,8 @@ def get_data_loader(batch_size, from_ppg, shuffle_training=True):
 
     train_data_loader = DataLoader(
         train_data, batch_size=batch_size, shuffle=shuffle_training, num_workers=4, pin_memory=True)
-    if not shuffle_training:
-        test_data_loader = DataLoader(
-            test_data, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
-    else:
-        test_data_loader = DataLoader(
-            test_data, batch_size=15, shuffle=True, num_workers=4, pin_memory=True)
+
+    test_data_loader = DataLoader(
+        test_data, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     return train_data_loader, test_data_loader
