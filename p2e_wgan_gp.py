@@ -1,4 +1,4 @@
-import torch.autograd as autograd
+
 import argparse
 import time
 import datetime
@@ -10,7 +10,7 @@ import torch
 import torch.optim as optim
 from models import weights_init_normal, GeneratorUNet, Discriminator
 from data import get_data_loader
-from utils import sample_images, evaluate_generated_signal_quality, smoother
+from utils import compute_gradient_penalty, smoother, sample_images, evaluate_generated_signal_quality
 
 torch.backends.cudnn.benchmark = True
 
@@ -23,7 +23,7 @@ parser.add_argument("--is_eval", type=bool,
                     default=False, help="evaluation mode")
 parser.add_argument("--from_ppg", type=bool, default=True,
                     help="reconstruct from ppg")
-parser.add_argument("--peaks_only", type=bool, default=True,
+parser.add_argument("--peaks_only", type=bool, default=False,
                     help="L2 loss on peaks only")
 parser.add_argument("--dataset_name", type=str,
                     default="mimic_wgan_gp", help="name of the dataset")
@@ -37,6 +37,10 @@ parser.add_argument("--b1", type=float, default=0.5,
                     help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999,
                     help="adam: decay of first order momentum of gradient")
+parser.add_argument("--lambda_gp", type=float, default=10,
+                    help="Loss weight for gradient penalty")
+parser.add_argument("--ncritic", type=int, default=3,
+                    help=" number of iterations of the critic per generator iteration")
 parser.add_argument("--n_cpu", type=int, default=4,
                     help="number of cpu threads to use during batch generation")
 parser.add_argument("--signal_length", type=int,
@@ -47,31 +51,35 @@ parser.add_argument("--checkpoint_interval", type=int,
 args, unknown = parser.parse_known_args()
 print(args)
 
-
-gen_weight = 1
-disc_weight = 1
-lambda_pixel = 20
-rpeak_weight = 4
-#opeak_weight = 2
-
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 cuda = True if torch.cuda.is_available() else False
 
-dataloader, val_dataloader = get_data_loader(args.batch_size, from_ppg=args.from_ppg,
-                                             shuffle_training=args.shuffle_training)
+# Weighting for L2 loss
+if args.peaks_only:
+    lambda_pixel = 20
+    rpeak_weight = 4
+else:
+    lambda_pixel = 50
 
 # Loss functions
-criterion_pixelwise = torch.nn.MSELoss(reduction='sum')
+if args.peaks_only:
+    criterion_pixelwise = torch.nn.MSELoss(reduction='sum')
+else:
+    criterion_pixelwise = torch.nn.MSELoss()
 
 # Calculate output of signal discriminator (PatchGAN)
 patch = (1, 9)
+
+# Load data
+dataloader, val_dataloader = get_data_loader(args.batch_size, from_ppg=args.from_ppg,
+                                             shuffle_training=args.shuffle_training)
 
 # Initialize generator and discriminator
 generator = GeneratorUNet()
 discriminator = Discriminator()
 
 if cuda:
-    if torch.cuda.device_count() > 1:
+    if torch.cuda.device_count() > 2:
         # if False:
         generator = torch.nn.DataParallel(
             generator, device_ids=[0, 1, 2]).to(device)
@@ -102,6 +110,8 @@ if args.epoch != 0:
     optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
 
     if args.is_eval:
+        sample_images(args.dataset_name, val_dataloader,
+                      generator, args.epoch, device)
         evaluate_generated_signal_quality(
             val_dataloader, generator, None, args.epoch, device)
         sys.exit()
@@ -114,7 +124,6 @@ os.makedirs("saved_models/%s" % args.dataset_name, exist_ok=True)
 os.makedirs("sample_signals/%s" % args.dataset_name, exist_ok=True)
 os.makedirs("logs/%s" % args.dataset_name, exist_ok=True)
 writer = SummaryWriter("logs/%s" % args.dataset_name)
-images = []
 
 # ----------
 #  Training
@@ -128,7 +137,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
         real_A = batch[0].to(device)
         real_B = batch[1].to(device)
 
-        if i % 3 == 0:
+        if i % args.ncritic == 0:
 
             # ------------------
             #  Train Generators
@@ -141,7 +150,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
             fake_B = generator(real_A)
 
             # Pixel-wise loss
-            if args.from_ppg:
+            if args.from_ppg and args.peaks_only:
                 opeaks = batch[2].to(device)
                 rpeaks = batch[3].to(device)
                 fake_B_masked_opeaks = fake_B * (opeaks != 0)
@@ -155,10 +164,6 @@ for epoch in range(args.epoch+1, args.n_epochs):
                     fake_B_masked_rpeaks, rpeaks)
                 loss_pixel = loss_pixel_opeaks / opeak_count + \
                     rpeak_weight * loss_pixel_rpeaks / rpeak_count
-
-                if not args.peaks_only:
-                    loss_pixel = loss_pixel + \
-                        criterion_pixelwise(fake_B, real_B)
             else:
                 loss_pixel = criterion_pixelwise(fake_B, real_B)
 
@@ -170,7 +175,7 @@ for epoch in range(args.epoch+1, args.n_epochs):
             loss_GAN = -torch.mean(pred_fake)
 
             # Total loss
-            loss_G = gen_weight * loss_GAN + lambda_pixel * loss_pixel
+            loss_G = loss_GAN + lambda_pixel * loss_pixel
 
             loss_G.backward()
             optimizer_G.step()
@@ -191,11 +196,11 @@ for epoch in range(args.epoch+1, args.n_epochs):
         fake_validity = discriminator(fake_B.detach(), real_A)
         # Gradient penalty
         gradient_penalty = compute_gradient_penalty(
-            discriminator, real_B, fake_B.detach(), real_A)
+            discriminator, real_B, fake_B.detach(), real_A, patch, device)
         # Adversarial loss
         loss_D0 = -torch.mean(real_validity) + \
-            torch.mean(fake_validity) + 10 * gradient_penalty
-        loss_D = loss_D0 * disc_weight
+            torch.mean(fake_validity) + args.lambda_gp * gradient_penalty
+        loss_D = loss_D0
 
         loss_D.backward()
         optimizer_D.step()
@@ -238,29 +243,6 @@ for epoch in range(args.epoch+1, args.n_epochs):
             'optimizer_D_state_dict': optimizer_D.state_dict(),
         }, "saved_models/%s/multi_models_%d.pth" % (args.dataset_name, epoch))
         sample_images(args.dataset_name, val_dataloader,
-                      generator, images, writer, epoch, device)
+                      generator, epoch, device)
         evaluate_generated_signal_quality(
             val_dataloader, generator, writer, epoch, device)
-
-
-def compute_gradient_penalty(D, real_samples, fake_samples, real_A):
-    """Calculates the gradient penalty loss for WGAN GP"""
-    alpha = torch.rand((real_samples.size(0), 1, 1)).to(device)
-    interpolates = (alpha * real_samples + ((1 - alpha)
-                                            * fake_samples)).requires_grad_(True)
-    d_interpolates = D(interpolates, real_A)
-    fake = torch.full(
-        (real_samples.shape[0], *patch), 1, dtype=torch.float, device=device)
-
-    # Get gradient w.r.t. interpolates
-    gradients = autograd.grad(
-        outputs=d_interpolates,
-        inputs=interpolates,
-        grad_outputs=fake,
-        create_graph=True,
-        retain_graph=True,
-        only_inputs=True,
-    )[0]
-    gradients = gradients.view(gradients.size(0), -1)
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-    return gradient_penalty
