@@ -47,12 +47,12 @@ def smoother(fake, device):
     return fake
 
 
-def sample_images(dataset_name, val_dataloader, generator, steps, device):
+def sample_images(experiment_name, val_dataloader, generator, steps, device):
     """Saves generated signals from the validation set"""
 
     generator.eval()
 
-    current_img_dir = "sample_signals/%s/%s.png" % (dataset_name, steps)
+    current_img_dir = "sample_signals/%s/%s.png" % (experiment_name, steps)
 
     signals = next(iter(val_dataloader))
     real_A = signals[0].to(device)

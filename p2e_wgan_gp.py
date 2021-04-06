@@ -15,6 +15,10 @@ from utils import compute_gradient_penalty, smoother, sample_images, evaluate_ge
 torch.backends.cudnn.benchmark = True
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--experiment_name", type=str,
+                    default="p2e_wgan_gp_mimic", help="name of the experiment")
+parser.add_argument("--dataset_prefix", type=str,
+                    default="data/mimic/", help="path to the train and valid dataset")
 parser.add_argument("--epoch", type=int, default=0,
                     help="epoch to start training from")
 parser.add_argument("--shuffle_training", type=bool,
@@ -25,8 +29,6 @@ parser.add_argument("--from_ppg", type=bool, default=True,
                     help="reconstruct from ppg")
 parser.add_argument("--peaks_only", type=bool, default=False,
                     help="L2 loss on peaks only")
-parser.add_argument("--dataset_name", type=str,
-                    default="mimic_wgan_gp", help="name of the dataset")
 parser.add_argument("--n_epochs", type=int, default=10000,
                     help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=192,
@@ -71,7 +73,7 @@ else:
 patch = (1, 9)
 
 # Load data
-dataloader, val_dataloader = get_data_loader(args.batch_size, from_ppg=args.from_ppg,
+dataloader, val_dataloader = get_data_loader(args.dataset_prefix, args.batch_size, from_ppg=args.from_ppg,
                                              shuffle_training=args.shuffle_training)
 
 # Initialize generator and discriminator
@@ -101,7 +103,7 @@ if args.epoch != 0:
     # Load pretrained models
 
     pretrained_path = "saved_models/%s/multi_models_%d.pth" % (
-        args.dataset_name, args.epoch)
+        args.experiment_name, args.epoch)
     checkpoint = torch.load(pretrained_path)
     generator.load_state_dict(checkpoint['generator_state_dict'])
     discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
@@ -110,7 +112,7 @@ if args.epoch != 0:
     optimizer_D.load_state_dict(checkpoint['optimizer_D_state_dict'])
 
     if args.is_eval:
-        sample_images(args.dataset_name, val_dataloader,
+        sample_images(args.experiment_name, val_dataloader,
                       generator, args.epoch, device)
         evaluate_generated_signal_quality(
             val_dataloader, generator, None, args.epoch, device)
@@ -120,10 +122,10 @@ else:
     generator.apply(weights_init_normal)
     discriminator.apply(weights_init_normal)
 
-os.makedirs("saved_models/%s" % args.dataset_name, exist_ok=True)
-os.makedirs("sample_signals/%s" % args.dataset_name, exist_ok=True)
-os.makedirs("logs/%s" % args.dataset_name, exist_ok=True)
-writer = SummaryWriter("logs/%s" % args.dataset_name)
+os.makedirs("saved_models/%s" % args.experiment_name, exist_ok=True)
+os.makedirs("sample_signals/%s" % args.experiment_name, exist_ok=True)
+os.makedirs("logs/%s" % args.experiment_name, exist_ok=True)
+writer = SummaryWriter("logs/%s" % args.experiment_name)
 
 # ----------
 #  Training
@@ -241,8 +243,8 @@ for epoch in range(args.epoch+1, args.n_epochs):
             'optimizer_G_state_dict': optimizer_G.state_dict(),
             'discriminator_state_dict': discriminator.state_dict(),
             'optimizer_D_state_dict': optimizer_D.state_dict(),
-        }, "saved_models/%s/multi_models_%d.pth" % (args.dataset_name, epoch))
-        sample_images(args.dataset_name, val_dataloader,
+        }, "saved_models/%s/multi_models_%d.pth" % (args.experiment_name, epoch))
+        sample_images(args.experiment_name, val_dataloader,
                       generator, epoch, device)
         evaluate_generated_signal_quality(
             val_dataloader, generator, writer, epoch, device)

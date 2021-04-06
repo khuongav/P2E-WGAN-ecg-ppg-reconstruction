@@ -60,18 +60,18 @@ def get_bio_data(from_data_path, to_data_path, ecg_peaks_data_path=None):
     return BioData(from_data_path, to_data_path, transformer, ecg_peaks_data_path)
 
 
-def get_data_loader(batch_size, from_ppg, shuffle_training=True):
-    train_ppg_data_path = 'data/mimic/ppg_train.npy'
-    eval_ppg_data_path = 'data/mimic/ppg_eval.npy'
+def get_data_loader(dataset_prefix, batch_size, from_ppg, shuffle_training=True):
+    train_ppg_data_path = dataset_prefix + 'ppg_train.npy'
+    eval_ppg_data_path = dataset_prefix + 'ppg_eval.npy'
 
-    train_ecg_data_path = 'data/mimic/ecg_train.npy'
-    eval_ecg_data_path = 'data/mimic/ecg_eval.npy'
+    train_ecg_data_path = dataset_prefix + 'ecg_train.npy'
+    eval_ecg_data_path = dataset_prefix + 'ecg_eval.npy'
 
-    train_ecg_peaks_data_path = {'opeaks': 'data/mimic/ecg_opeaks_train.npy',
-                                 'rpeaks': 'data/mimic/ecg_rpeaks_train.npy'}
+    train_ecg_peaks_data_path = {'opeaks': dataset_prefix + 'ecg_opeaks_train.npy',
+                                 'rpeaks': dataset_prefix + 'ecg_rpeaks_train.npy'}
 
-    eval_ecg_peaks_data_path = {'opeaks': 'data/mimic/ecg_opeaks_eval.npy',
-                                'rpeaks': 'data/mimic/ecg_rpeaks_eval.npy'}
+    eval_ecg_peaks_data_path = {'opeaks': dataset_prefix + 'ecg_opeaks_eval.npy',
+                                'rpeaks': dataset_prefix + 'ecg_rpeaks_eval.npy'}
 
     if from_ppg:
         train_data = get_bio_data(
