@@ -109,7 +109,7 @@ def evaluate_generated_signal_quality(val_dataloader, generator, writer, steps, 
     all_signal = np.vstack(all_signal_)
     all_generated_signal = np.vstack(all_generated_signal_)
 
-    rmse_p_pairs = Parallel(n_jobs=8)(delayed(eval_rmse_p)(
+    rmse_p_pairs = Parallel(n_jobs=4)(delayed(eval_rmse_p)(
         signal_a, signal_b) for signal_a, signal_b in zip(all_signal, all_generated_signal))
     res = list(zip(*rmse_p_pairs))
 
