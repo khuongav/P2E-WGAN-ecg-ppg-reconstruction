@@ -113,7 +113,7 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, signal_A, signal_B):
-        # Concatenate image and condition image by channels to produce input
+        # Concatenate signals and condition signals by channels to produce input
         signal_input = torch.cat((signal_A, signal_B), 1)
         return self.model(signal_input)
 

@@ -23,6 +23,8 @@ parser.add_argument("--epoch", type=int, default=0,
                     help="epoch to start training from")
 parser.add_argument("--shuffle_training", type=bool,
                     default=True, help="shuffle training")
+parser.add_argument("--shuffle_testing", type=bool,
+                    default=False, help="shuffle testing")
 parser.add_argument("--is_eval", type=bool,
                     default=False, help="evaluation mode")
 parser.add_argument("--from_ppg", type=bool, default=True,
@@ -74,7 +76,8 @@ patch = (1, 9)
 
 # Load data
 dataloader, val_dataloader = get_data_loader(args.dataset_prefix, args.batch_size, from_ppg=args.from_ppg,
-                                             shuffle_training=args.shuffle_training)
+                                             shuffle_training=args.shuffle_training, 
+                                             shuffle_testing=args.shuffle_testing)
 
 # Initialize generator and discriminator
 generator = GeneratorUNet()
@@ -192,9 +195,9 @@ for epoch in range(args.epoch+1, args.n_epochs):
         # optimizer_D.zero_grad()
         for p in discriminator.parameters():
             p.grad = None
-        # Real images
+        # Real signals
         real_validity = discriminator(real_B, real_A)
-        # Fake images
+        # Fake signals
         fake_validity = discriminator(fake_B.detach(), real_A)
         # Gradient penalty
         gradient_penalty = compute_gradient_penalty(
