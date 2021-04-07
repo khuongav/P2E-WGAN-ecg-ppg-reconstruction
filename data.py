@@ -60,7 +60,7 @@ def get_bio_data(from_data_path, to_data_path, ecg_peaks_data_path=None):
     return BioData(from_data_path, to_data_path, transformer, ecg_peaks_data_path)
 
 
-def get_data_loader(dataset_prefix, batch_size, from_ppg, shuffle_training=True):
+def get_data_loader(dataset_prefix, batch_size, from_ppg, shuffle_training=True, shuffle_testing=False):
     train_ppg_data_path = dataset_prefix + 'ppg_train.npy'
     eval_ppg_data_path = dataset_prefix + 'ppg_eval.npy'
 
@@ -86,6 +86,6 @@ def get_data_loader(dataset_prefix, batch_size, from_ppg, shuffle_training=True)
         train_data, batch_size=batch_size, shuffle=shuffle_training, num_workers=4, pin_memory=True)
 
     eval_data_loader = DataLoader(
-        eval_data, batch_size=15, shuffle=True, num_workers=4, pin_memory=True)
+        eval_data, batch_size=15, shuffle=shuffle_testing, num_workers=4, pin_memory=True)
 
     return train_data_loader, eval_data_loader
