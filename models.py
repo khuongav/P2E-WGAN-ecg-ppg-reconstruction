@@ -12,9 +12,9 @@ def weights_init_normal(m):
         torch.nn.init.constant_(m.bias.data, 0.0)
 
 
-##############################
-#           U-NET
-##############################
+# ----------
+#  U-NET
+# ----------
 
 class UNetDown(nn.Module):
     def __init__(self, in_size, out_size, ksize=4, stride=2, normalize=True, dropout=0.0):
@@ -53,6 +53,10 @@ class UNetUp(nn.Module):
         return x
 
 
+# ----------
+#  Generator
+# ----------
+
 class GeneratorUNet(nn.Module):
     def __init__(self, in_channels=1, out_channels=1):
         super(GeneratorUNet, self).__init__()
@@ -88,9 +92,9 @@ class GeneratorUNet(nn.Module):
         return self.final(u3)
 
 
-##############################
-#        Discriminator
-##############################
+# --------------
+#  Discriminator
+# --------------
 
 class Discriminator(nn.Module):
     def __init__(self, in_channels=1):
