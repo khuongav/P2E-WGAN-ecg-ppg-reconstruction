@@ -21,7 +21,7 @@ To install the dependencies, you can run in your terminal:
 pip install -r requirements.txt
 ```
 
-A small sampled dataset can be downloaded at [\[link\]](https://drive.google.com/file/d/1lLTerHpAx0w3Xg2QxZCuI6wAxpuC0TCH/view?usp=sharing).
+A small sampled dataset with ECG feature indices can be downloaded at [\[link\]](https://drive.google.com/file/d/1lLTerHpAx0w3Xg2QxZCuI6wAxpuC0TCH/view?usp=sharing).
 
 ## Usage
 
@@ -30,6 +30,8 @@ The code is structured as follows:
 - `models.py` defines deep neural network architectures; 
 - `utils.py` has utilities to benchmark the model and calculate the gradient penalty;
 - `p2e_wgan_gp.py` is the main entry to run the training and evaluation process;
+    - `--dataset_prefix` flag sets the directory containing the .npy files 
+    - `--peaks_only` flag sets the model to reconstruct precisely only the main features for data augmentation purposes
 
 ## Citation
 
