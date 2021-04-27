@@ -1,6 +1,6 @@
 # Codebase for "P2E-WGAN: ECG Waveform Synthesis from PPG with Conditional Wasserstein Generative Adversarial Networks"
 
-Paper link: https://dl.acm.org/doi/pdf/10.1145/3412841.3441979
+Paper link: https://dl.acm.org/doi/10.1145/3412841.3441979
 
 ![](images/intro.png)
 
@@ -21,7 +21,7 @@ To install the dependencies, you can run in your terminal:
 pip install -r requirements.txt
 ```
 
-A small sampled dataset with ECG feature indices can be downloaded at [\[link\]](https://drive.google.com/file/d/1lLTerHpAx0w3Xg2QxZCuI6wAxpuC0TCH/view?usp=sharing).
+A sampled dataset with ECG feature indices can be downloaded at [\[link\]](https://drive.google.com/file/d/1lLTerHpAx0w3Xg2QxZCuI6wAxpuC0TCH/view?usp=sharing).
 
 ## Usage
 
